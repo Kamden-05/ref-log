@@ -67,12 +67,12 @@ def get_auth_token():
     return token['token_type'] + ' ' + token['access_token']
 
 # Send get request to assignr for games. Returns game JSON data
-def get_assignr_games(token):
+def get_assignr_games():
     url = 'https://api.assignr.com/api/v2/current_account/games?page=1&limit=50'
 
     headers = {
         'accept': 'application/json',
-        'authorization': token
+        'authorization': get_auth_token()
     }
 
     try:
@@ -92,8 +92,8 @@ def get_assignr_games(token):
     data = response.json()
     return data['_embedded']['games']
 
-# Parse JSON game data and converts it to a dataframe ready to be written to spreadsheet
-def flatten_game_json(gameJson):
+# Normalizes JSON game data and converts it to a dataframe
+def to_dataframe(gameJson):
     df = pd.json_normalize(gameJson)
     df = df.explode('_embedded.assignments')
     df = pd.json_normalize(json.loads(df.to_json(orient='records')))
@@ -208,11 +208,8 @@ def format_sheet(writer, num_rows):
     worksheet.conditional_format('A3:K' + num_rows, {'type': 'formula', 'criteria': formula, 'value': 'Unpaid', 'format': unpaid })
     worksheet.conditional_format('A3:K' + num_rows, {'type': 'formula', 'criteria': formula, 'value': 'Unpaid', 'format': full_border })
 
-    
-token = get_auth_token()
-
-game_json = get_assignr_games(token)
-game_df = flatten_game_json(game_json)
+game_json = get_assignr_games()
+game_df = to_dataframe(game_json)
 game_df = clean_data(game_df)
 game_df = merge_dataframe(game_df, BACKUP_FILE)
 
