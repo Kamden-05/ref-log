@@ -11,10 +11,10 @@ import os
 #TODO: create pivot tables
 #TODO: use command line arguments to choose output file
 #TODO: modify API request to get games from a specific date range
-#TODO: add error handling for API requests, file opening and writing,
 #TODO: change file paths to be relative
 #TODO: copy most recent log into a backup before modifying file
 #TODO: convert xlsxwriter functions to openpyxl functions
+#TODO: remove hard coded cell references
 
 # Name of excel file to write to
 OUTPUT_FILE = 'test.xlsx'
@@ -41,15 +41,28 @@ COLUMNS = [DATE, TIME, VENUE, LEAGUE,
            AGE_GROUP, HOME_TEAM, AWAY_TEAM,
            POSITION, ASSIGNOR, PAY_STATUS, FEE]
 
-# Get auth token from assignr. Returns token for Get requests
-def get_token():
+# Returns assignr auth token for Get requests
+def get_auth_token():
     url = 'https://app.assignr.com/oauth/token'
     authData = {'client_id': CLIENT_ID, 
                 'client_secret': CLIENT_SECRET,
                 'scope': 'read',
                 'grant_type': 'client_credentials'}
-
-    response = requests.post(url, data=authData)
+    
+    try:
+        response = requests.post(url, data=authData, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        raise SystemExit(err) 
+    except requests.ConnectionError as err:
+        raise SystemExit(err)           
+    except requests.Timeout as err:
+        raise SystemExit(err) 
+    except requests.RequestException as err:
+        raise SystemExit(err) 
+    except KeyboardInterrupt:
+        raise SystemExit(err)
+      
     token = response.json()
     return token['token_type'] + ' ' + token['access_token']
 
@@ -62,10 +75,21 @@ def get_assignr_games(token):
         'authorization': token
     }
 
-    response = requests.get(url, headers=headers)
+    try:
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        raise SystemExit(err) 
+    except requests.ConnectionError as err:
+        raise SystemExit(err)           
+    except requests.Timeout as err:
+        raise SystemExit(err) 
+    except requests.RequestException as err:
+        raise SystemExit(err) 
+    except KeyboardInterrupt:
+        raise SystemExit(err)
 
     data = response.json()
-
     return data['_embedded']['games']
 
 # Parse JSON game data and converts it to a dataframe ready to be written to spreadsheet
@@ -164,8 +188,9 @@ def format_sheet(writer, num_rows):
 
     worksheet.merge_range('A1:K1', title, format)
     worksheet.set_row(1, 15) # Set the header row height to 15
-    # puting it all together
+    
     # Write the column headers with the defined format.
+    #TODO: pass dataframe in as function arg
     for col_num, value in enumerate(game_df.columns.values):
         #print(col_num, value)
         worksheet.write(1, col_num, value, header_format)
@@ -184,7 +209,8 @@ def format_sheet(writer, num_rows):
     worksheet.conditional_format('A3:K' + num_rows, {'type': 'formula', 'criteria': formula, 'value': 'Unpaid', 'format': full_border })
 
     
-token = get_token()
+token = get_auth_token()
+
 game_json = get_assignr_games(token)
 game_df = flatten_game_json(game_json)
 game_df = clean_data(game_df)
