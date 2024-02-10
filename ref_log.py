@@ -26,7 +26,7 @@ CLIENT_SECRET = os.getenv("ASSIGNR_CLIENT_SECRET")
 
 # dict of final olumn names
 COLUMNS = {
-    "date": "peepeepoopoo",
+    "date": "Date",
     "time": "Time",
     "venue": "Venue",
     "league": "League",
