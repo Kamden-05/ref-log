@@ -24,42 +24,32 @@ BACKUP_FILE = "backup.xlsx"
 CLIENT_ID = os.getenv("ASSIGNR_CLIENT_ID")
 CLIENT_SECRET = os.getenv("ASSIGNR_CLIENT_SECRET")
 
-# list of column names that we want to keep in our final dataframe
-DATE = "Date"
-TIME = "Time"
-VENUE = "Venue"
-LEAGUE = "League"
-AGE_GROUP = "Age_Group"
-HOME_TEAM = "Home_Team"
-AWAY_TEAM = "Away_Team"
-POSITION = "Position"
-ASSIGNOR = "Assignor"
-PAY_STATUS = "Pay_Status"
-FEE = "Fee"
-
-COLUMNS = [
-    DATE,
-    TIME,
-    VENUE,
-    LEAGUE,
-    AGE_GROUP,
-    HOME_TEAM,
-    AWAY_TEAM,
-    POSITION,
-    ASSIGNOR,
-    PAY_STATUS,
-    FEE,
-]
+# dict of final olumn names
+COLUMNS = {
+    "date": "peepeepoopoo",
+    "time": "Time",
+    "venue": "Venue",
+    "league": "League",
+    "age": "Age_Group",
+    "home": "Home_Team",
+    "away": "Away_Team",
+    "position": "Position",
+    "assignor": "Assignor",
+    "paid": "Pay_Status",
+    "fee": "Fee",
+}
 
 
 # Returns assignr auth token for Get requests
 def get_assignr_token():
-    url = 'https://app.assignr.com/oauth/token'
-    authData = {'client_id': CLIENT_ID, 
-                'client_secret': CLIENT_SECRET,
-                'scope': 'read',
-                'grant_type': 'client_credentials'}
-    
+    url = "https://app.assignr.com/oauth/token"
+    authData = {
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "scope": "read",
+        "grant_type": "client_credentials",
+    }
+
     try:
         response = requests.post(url, data=authData, timeout=30)
         response.raise_for_status()
@@ -101,28 +91,30 @@ def get_assignr_games():
     data = response.json()
     return data["_embedded"]["games"]
 
+
 # Normalizes JSON game data and converts it to a dataframe
 def flatten_json(gameJson):
     df = pd.json_normalize(gameJson)
-    df = df.explode('_embedded.assignments')
-    df = pd.json_normalize(json.loads(df.to_json(orient='records')))
-    df = df.explode('_embedded.assignments._embedded.fees')
-    return(pd.json_normalize(json.loads(df.to_json(orient='records'))))
+    df = df.explode("_embedded.assignments")
+    df = pd.json_normalize(json.loads(df.to_json(orient="records")))
+    df = df.explode("_embedded.assignments._embedded.fees")
+    return pd.json_normalize(json.loads(df.to_json(orient="records")))
+
 
 # performs various pandas functions to clean the specific parts of the data I kepe
 def clean_data(df):
     # rename important columns for readability
     df = df.rename(
         columns={
-            "localized_date": DATE,
-            "localized_time": TIME,
-            "_embedded.venue.name": VENUE,
-            "league": LEAGUE,
-            "age_group": AGE_GROUP,
-            "home_team": HOME_TEAM,
-            "away_team": AWAY_TEAM,
-            "_embedded.assignments.position": POSITION,
-            "_embedded.assignments._embedded.fees.value": FEE,
+            "localized_date": COLUMNS["date"],
+            "localized_time": COLUMNS["time"],
+            "_embedded.venue.name": COLUMNS["venue"],
+            "league": COLUMNS["league"],
+            "age_group": COLUMNS["age"],
+            "home_team": COLUMNS["home"],
+            "away_team": COLUMNS["away"],
+            "_embedded.assignments.position": COLUMNS["position"],
+            "_embedded.assignments._embedded.fees.value": COLUMNS["fee"],
             "_embedded.assignor.first_name": "assignor_first",
             "_embedded.assignor.last_name": "assignor_last",
             "_embedded.assignments._embedded.official.first_name": "official_first",
@@ -134,17 +126,19 @@ def clean_data(df):
     # drop rows that contain data for other officials
     df = df.loc[(df["official_last"] == "Wilson") & (df["official_first"] == "Kamden")]
 
-    df.insert(0, PAY_STATUS, "Unpaid")
+    df.insert(0, COLUMNS["paid"], "Unpaid")
 
     # make certain leagues more readable
-    df.loc[df[LEAGUE].str.contains("MLS"), LEAGUE] = "MLS NEXT"
-    df.loc[df[LEAGUE].str.contains("MLS"), "gender"] = "Boys"
-    df.loc[df[LEAGUE].str.contains("TAPPS"), LEAGUE] = "TAPPS"
-    df.loc[df[LEAGUE].str.contains("North Texas Soccer"), LEAGUE] = "NTX Soccer"
+    df.loc[df[COLUMNS["league"]].str.contains("MLS"), COLUMNS["league"]] = "MLS NEXT"
+    df.loc[df[COLUMNS["league"]].str.contains("MLS"), "gender"] = "Boys"
+    df.loc[df[COLUMNS["league"]].str.contains("TAPPS"), COLUMNS["league"]] = "TAPPS"
+    df.loc[
+        df[COLUMNS["league"]].str.contains("North Texas Soccer"), COLUMNS["league"]
+    ] = "NTX Soccer"
 
     # make certain age groups more readable
-    df[AGE_GROUP] = df[AGE_GROUP].str.replace(" Mini", "", case=False)
-    df[AGE_GROUP] = df[AGE_GROUP].str.replace(" Full", "", case=False)
+    df[COLUMNS["age"]] = df[COLUMNS["age"]].str.replace(" Mini", "", case=False)
+    df[COLUMNS["age"]] = df[COLUMNS["age"]].str.replace(" Full", "", case=False)
 
     # add Chris Luna to assignor name if the game is from LunaCore Assigning
     df.loc[df["site"] == "LunaCore Group Assigning", "assignor_last"] = "Luna"
@@ -155,27 +149,29 @@ def clean_data(df):
     df["assignor_first"] = df["assignor_first"].ffill()
 
     # merge assignor first and last name columns into one column
-    df[ASSIGNOR] = df[["assignor_first", "assignor_last"]].agg(" ".join, axis=1)
+    df[COLUMNS["assignor"]] = df[["assignor_first", "assignor_last"]].agg(
+        " ".join, axis=1
+    )
 
     # merge age_group and gender into one column
     df["gender"] = df["gender"].ffill()
-    df[AGE_GROUP] = df[[AGE_GROUP, "gender"]].agg(" ".join, axis=1)
+    df[COLUMNS["age"]] = df[[COLUMNS["age"], "gender"]].agg(" ".join, axis=1)
 
     # change Position cell values from 'Asst. Referee' to 'AR'
-    df[POSITION] = df[POSITION].replace("Asst. Referee", "AR")
+    df[COLUMNS["position"]] = df[COLUMNS["position"]].replace("Asst. Referee", "AR")
 
     # set Date and Time columns to Datetime instead of str
-    df[DATE] = pd.to_datetime(df[DATE])
+    df[COLUMNS["date"]] = pd.to_datetime(df[COLUMNS["date"]])
 
     # filter out unecessary columns
-    return df[COLUMNS]
+    return df[list(COLUMNS.values())]
 
 
 # Merges new games with already logged games into one dataframe
 def merge_dataframe(df, file):
     main_df = pd.read_excel(open(file, "rb"), sheet_name="Games")
     main_df = main_df.merge(df, how="outer")
-    main_df[DATE] = pd.to_datetime(main_df[DATE]).dt.date
+    main_df[COLUMNS["date"]] = pd.to_datetime(main_df[COLUMNS["date"]]).dt.date
     return main_df
 
 
@@ -247,10 +243,10 @@ game_df = flatten_json(game_json)
 game_df = clean_data(game_df)
 game_df = merge_dataframe(game_df, BACKUP_FILE)
 
-#shutil.copy(OUTPUT_FILE, BACKUP_FILE)
+shutil.copy(OUTPUT_FILE, BACKUP_FILE)
 
-writer = pd.ExcelWriter(OUTPUT_FILE, engine='xlsxwriter')
-game_df.to_excel(writer, sheet_name='Games', index=False)
+writer = pd.ExcelWriter(OUTPUT_FILE, engine="xlsxwriter")
+game_df.to_excel(writer, sheet_name="Games", index=False)
 
 format_sheet(writer, str(len(game_df) + 1))
 
