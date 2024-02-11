@@ -65,7 +65,7 @@ def get_assignr_token():
         raise SystemExit(err)
 
     token = response.json()
-    return token["token_type"] + " " + token["access_token"]
+    return f"{token['token_type']} {token['access_token']}"
 
 
 # Send get request to assignr for games. Returns game JSON data
@@ -224,11 +224,11 @@ def format_sheet(writer, num_rows):
     unpaid = workbook.add_format({"bg_color": "#FFC7CE", "font_color": "#9C0006"})
     formula = '=$J3="Unpaid"'
     worksheet.conditional_format(
-        "A3:K" + num_rows,
+        f"A3:K{num_rows}",
         {"type": "formula", "criteria": formula, "value": "Unpaid", "format": unpaid},
     )
     worksheet.conditional_format(
-        "A3:K" + num_rows,
+        f"A3:K{num_rows}",
         {
             "type": "formula",
             "criteria": formula,
