@@ -169,7 +169,9 @@ def clean_data(df):
 
 # Merges new games with already logged games into one dataframe
 def merge_dataframe(df, file):
-    main_df = pd.read_excel(open(file, "rb"), sheet_name="Games")
+    main_df = pd.read_excel(
+        open(file, "rb"), sheet_name="Games", header=1
+    )  # header row is 0-indexed
     main_df = main_df.merge(df, how="outer")
     main_df[COLUMNS["date"]] = pd.to_datetime(main_df[COLUMNS["date"]]).dt.date
     return main_df
@@ -241,9 +243,9 @@ def format_sheet(writer, num_rows):
 game_json = get_assignr_games()
 game_df = flatten_json(game_json)
 game_df = clean_data(game_df)
-game_df = merge_dataframe(game_df, BACKUP_FILE)
 
 shutil.copy(OUTPUT_FILE, BACKUP_FILE)
+game_df = merge_dataframe(game_df, OUTPUT_FILE)
 
 writer = pd.ExcelWriter(OUTPUT_FILE, engine="xlsxwriter")
 game_df.to_excel(writer, sheet_name="Games", index=False)
