@@ -12,7 +12,6 @@ import os
 # TODO: use command line arguments to choose output file
 # TODO: modify API request to get games from a specific date range
 # TODO: change file paths to be relative
-# TODO: copy most recent log into a backup before modifying file
 # TODO: convert xlsxwriter functions to openpyxl functions
 # TODO: remove hard coded cell references
 
@@ -172,7 +171,12 @@ def merge_dataframe(df, file):
     main_df = pd.read_excel(
         open(file, "rb"), sheet_name="Games", header=1
     )  # header row is 0-indexed
-    main_df = main_df.merge(df, how="outer")
+    try:
+        temp_df = main_df.merge(df, how="outer")
+    except pd.errors.MergeError:
+        main_df = df
+    else:
+        main_df = temp_df
     main_df[COLUMNS["date"]] = pd.to_datetime(main_df[COLUMNS["date"]]).dt.date
     return main_df
 
